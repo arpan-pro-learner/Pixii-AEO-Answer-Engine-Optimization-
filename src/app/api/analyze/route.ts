@@ -55,31 +55,65 @@ function extractJSON(raw: string): { recommendations: string[]; hooks: string[];
 async function callOllamaAgent(agentId: string, config: { name: string; systemPrompt: string; model: string }, query: string) {
   const prompt = `Search Query: ${query}\n\nProvide analysis as a ${config.name}. Return EXACT JSON:\n{\n  "recommendations": ["P1", "P2", "P3", "P4", "P5"],\n  "hooks": ["H1", "H2", "H3"],\n  "reasoning": "logic"\n}`;
 
-  try {
-    console.log(`[AEO] Calling Ollama for ${agentId} (${config.model})...`);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 300000); 
+  // Smart Detection: If we are on Vercel or have a remote URL, use the direct Cloud path
+  const isRemote = OLLAMA_BASE_URL.includes('https://') || OLLAMA_BASE_URL.includes('http://') && !OLLAMA_BASE_URL.includes('localhost') && !OLLAMA_BASE_URL.includes('127.0.0.1');
 
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        model: config.model, 
-        prompt: `System: ${config.systemPrompt}\n\n${prompt}`, 
-        stream: false 
-      }),
-      signal: controller.signal
-    });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000); 
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (OLLAMA_API_KEY) {
+      headers['Authorization'] = `Bearer ${OLLAMA_API_KEY}`;
+    }
+
+    let response;
+    
+    if (isRemote) {
+      // DIRECT CLOUD PATH (For Vercel - OpenAI/Cloud Compatible)
+      console.log(`[AEO] Direct Cloud call for ${agentId} to ${OLLAMA_BASE_URL}`);
+      response = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: config.model.replace(':cloud', ''), // Strip ':cloud' suffix if present for remote compatibility
+          messages: [
+            { role: 'system', content: config.systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          stream: false,
+          temperature: 0.1
+        }),
+        signal: controller.signal
+      });
+    } else {
+      // LOCAL OLLAMA PATH (For Development)
+      console.log(`[AEO] Local Ollama call for ${agentId} to ${OLLAMA_BASE_URL}`);
+      response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ 
+          model: config.model, 
+          prompt: `System: ${config.systemPrompt}\n\n${prompt}`, 
+          stream: false 
+        }),
+        signal: controller.signal
+      });
+    }
 
     clearTimeout(timeout);
+    
     if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`[AEO] Ollama Error Body:`, errorBody);
-      throw new Error(`Ollama failed with status ${response.status}: ${errorBody}`);
+      const errorText = await response.text();
+      throw new Error(`API failed (${response.status}): ${errorText.slice(0, 100)}`);
     }
 
     const data = await response.json();
-    return { id: agentId, name: config.name, modelUsed: config.model, content: extractJSON(data.response || '') };
+    
+    // Keyed result extraction (handles both Ollama and OpenAI formats)
+    const rawOutput = isRemote ? (data.choices?.[0]?.message?.content || '') : (data.response || '');
+    
+    return { id: agentId, name: config.name, modelUsed: config.model, content: extractJSON(rawOutput) };
   } catch (err: any) {
     console.error(`[AEO] ${agentId} failed:`, err.message);
     return {
