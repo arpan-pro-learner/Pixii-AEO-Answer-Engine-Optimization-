@@ -3,7 +3,7 @@ import { extractAEOData } from '@/lib/aeo-extractor';
 import { generateAEOInsights } from '@/lib/aeo-insights';
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434';
-const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || '';
+const OLLAMA_API_KEY = process.env.CLOUD_API_KEY || process.env.OLLAMA_API_KEY || '';
 
 const AGENT_CONFIGS = {
   general: {
