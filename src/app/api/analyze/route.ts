@@ -52,48 +52,51 @@ function extractJSON(raw: string): { recommendations: string[]; hooks: string[];
   };
 }
 
+export const maxDuration = 60;
+
 async function callOllamaAgent(agentId: string, config: { name: string; systemPrompt: string; model: string }, query: string) {
   const prompt = `Search Query: ${query}\n\nProvide analysis as a ${config.name}. Return EXACT JSON:\n{\n  "recommendations": ["P1", "P2", "P3", "P4", "P5"],\n  "hooks": ["H1", "H2", "H3"],\n  "reasoning": "logic"\n}`;
 
-  // Smart Detection: Ensure we don't double up on '/v1' or '/api/generate'
   const cleanBaseUrl = OLLAMA_BASE_URL.replace(/\/$/, '');
-  const isRemote = cleanBaseUrl.includes('https://') || (cleanBaseUrl.includes('http://') && !cleanBaseUrl.includes('localhost') && !cleanBaseUrl.includes('127.0.0.1'));
+  const isRemote = !cleanBaseUrl.includes('localhost') && !cleanBaseUrl.includes('127.0.0.1');
 
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); 
-
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (OLLAMA_API_KEY) {
-      headers['Authorization'] = `Bearer ${OLLAMA_API_KEY}`;
-    }
+    const timeout = setTimeout(() => controller.abort(), 90000); 
 
     let response;
     
     if (isRemote) {
-      // Ensure we hit the correct endpoint without path duplication
-      const cloudUrl = cleanBaseUrl.endsWith('/v1') || cleanBaseUrl.endsWith('/completions') 
-        ? cleanBaseUrl 
-        : `${cleanBaseUrl}/v1/chat/completions`;
-
-      console.log(`[AEO] Vercel Cloud Call to: ${cloudUrl}`);
-      response = await fetch(cloudUrl, {
+      // OFFICIAL OLLAMA CLOUD PATH
+      console.log(`[AEO] Calling Ollama Cloud for ${agentId} (${config.model})`);
+      response = await fetch('https://api.ollama.com/v1/chat/completions', {
         method: 'POST',
-        headers,
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${OLLAMA_API_KEY}` 
+        },
         body: JSON.stringify({
-          model: config.model.replace(':cloud', ''),
-          messages: [{ role: 'system', content: config.systemPrompt }, { role: 'user', content: prompt }],
-          stream: false
+          model: config.model,
+          messages: [
+            { role: 'system', content: config.systemPrompt },
+            { role: 'user', content: prompt }
+          ],
+          stream: false,
+          temperature: 0.1
         }),
         signal: controller.signal
       });
     } else {
-      const localUrl = `${cleanBaseUrl}/api/generate`;
-      console.log(`[AEO] Local Call to: ${localUrl}`);
-      response = await fetch(localUrl, {
+      // LOCAL OLLAMA PATH
+      console.log(`[AEO] Calling Local Ollama for ${agentId} to ${cleanBaseUrl}`);
+      response = await fetch(`${cleanBaseUrl}/api/generate`, {
         method: 'POST',
-        headers,
-        body: JSON.stringify({ model: config.model, prompt: `System: ${config.systemPrompt}\n\n${prompt}`, stream: false }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          model: config.model, 
+          prompt: `System: ${config.systemPrompt}\n\n${prompt}`, 
+          stream: false 
+        }),
         signal: controller.signal
       });
     }
@@ -101,31 +104,23 @@ async function callOllamaAgent(agentId: string, config: { name: string; systemPr
     clearTimeout(timeout);
     
     if (!response.ok) {
-       throw new Error(`Upstream Error ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`Upstream Error (${response.status}): ${errorText.slice(0, 100)}`);
     }
 
     const data = await response.json();
     const rawOutput = isRemote ? (data.choices?.[0]?.message?.content || '') : (data.response || '');
+    
     return { id: agentId, name: config.name, modelUsed: config.model, content: extractJSON(rawOutput) };
 
   } catch (err: any) {
-    console.error(`[AEO] Gateway failed for ${agentId}:`, err.message);
-    
-    // PRODUCTION FAIL-SAFE: Return high-quality realistic mock data instead of an error
-    // This ensures the hiring team ALWAYS sees a beautiful working dashboard.
-    const mockData = {
-      general: { recommendations: ["MacBook Air M2", "Dell XPS 13", "HP Spectre x360", "MacBook Pro 14", "Lenovo Yoga Pro 9i"], hooks: ["Ultimate Portability", "Value Leader", "Performance King"], reasoning: "The market strongly favors the M2/M3 architecture for efficiency and brand retention." },
-      health: { recommendations: ["MacBook Air (Liquid Retina)", "ASUS Zenbook S 13 OLED", "LG Gram 14", "Surface Laptop 5", "MacBook Air M1"], hooks: ["Blue Light Filter", "Ergonomic Keys", "Lightweight Build"], reasoning: "Focusing on eye-health certified displays and ergonomic form factors for long-term wellness." },
-      budget: { recommendations: ["MacBook Air M1 (Renewed)", "Acer Swift Go 14", "ASUS Vivobook 16", "Lenovo IdeaPad Slim 5", "MacBook Air M2 (Education)"], hooks: ["Best $/Performance", "Longest Lifespan", "High Resale Value"], reasoning: "Optimizing for total cost of ownership by prioritizing high resale value and base performance durability." }
-    };
-
-    const mockRes = mockData[agentId as keyof typeof mockData] || mockData.general;
-
+    console.error(`[AEO] API failure for ${agentId}:`, err.message);
     return {
       id: agentId,
       name: config.name,
-      modelUsed: "Pixii-Simulated-Intelligence",
-      content: mockRes
+      modelUsed: config.model,
+      error: err.message,
+      content: { recommendations: [], hooks: [], reasoning: `Intelligence generation failed: ${err.message}` }
     };
   }
 }
