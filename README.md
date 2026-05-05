@@ -17,7 +17,7 @@ By utilizing a refined color palette (brand orange and deep charcoals), glassmor
 
 ## 🛠️ Tools & APIs Used
 - **Next.js & React**: For a high-performance, responsive single-page application.
-- **Ollama Cloud SDK**: Powering the high-intelligence inference engine using **Gemma 4 (31B)** and **Qwen** models.
+- **Google Gemini API**: Powering the high-intelligence inference engine using **Gemini 2.5 Flash** for high-speed parallel persona simulations. It guarantees reliable, native Vercel deployment via the Vercel AI SDK.
 - **Vanilla CSS**: Custom design system built from scratch to achieve the signature Pixii glassmorphic look without dependency bloat.
 
 ## 🔮 If I had more time...

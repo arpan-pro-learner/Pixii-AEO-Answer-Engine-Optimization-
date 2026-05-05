@@ -82,7 +82,7 @@ const Navbar = () => (
         {/* Right */}
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ fontSize: "0.8rem", color: "var(--foreground-muted)" }}>
-            Powered by AI API's
+            Powered by Gemini AI API's
           </span>
           <div style={{
             width: "8px", height: "8px", borderRadius: "50%",
@@ -287,19 +287,25 @@ export default function Home() {
               {/* Error */}
               {error && (
                 <div style={{
-                  marginTop: "12px", padding: "10px 14px",
+                  marginTop: "12px", padding: "12px 16px",
                   background: "rgba(220,38,38,0.07)",
                   border: "1px solid rgba(220,38,38,0.2)",
-                  borderRadius: "8px", color: "var(--error)",
-                  fontSize: "0.85rem", textAlign: "center",
+                  borderRadius: "10px", color: "var(--error)",
+                  fontSize: "0.85rem", textAlign: "left",
                 }}>
-                  {error}
+                  <div style={{ fontWeight: 700, marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    Intelligence Suite Error
+                  </div>
+                  {error.includes("quota") || error.includes("exceeded") || error.includes("offline")
+                    ? "Your Gemini Free Tier API limit is currently busy. Please wait 60 seconds and try again (Google allows 15 requests per minute)."
+                    : error}
                 </div>
               )}
             </div>
 
             <p style={{ marginTop: "12px", fontSize: "0.8rem", color: "var(--foreground-light)" }}>
-              Free to use. Powered by Ollama API's.
+              Free to use. Powered by Gemini API's.
             </p>
           </div>
         </section>
