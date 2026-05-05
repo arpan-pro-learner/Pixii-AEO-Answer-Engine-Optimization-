@@ -11,17 +11,17 @@ const AGENT_CONFIGS = {
   general: {
     name: 'General Buyer',
     systemPrompt: 'You are a general consumer looking for the best overall product. You value brand reputation, high review counts, and general utility. Your goal is to identify current "market dominators".',
-    model: 'gemini-3.1-flash',
+    model: 'gemini-2.5-flash',
   },
   health: {
     name: 'Health Expert',
     systemPrompt: 'You are a certified health and wellness expert. You analyze products based on ingredient purity, certifications, and safety. You prioritize scientific superiority over popularity.',
-    model: 'gemini-3.1-flash',
+    model: 'gemini-2.5-flash',
   },
   budget: {
     name: 'Price-conscious Buyer',
     systemPrompt: 'You are a budget-focused shopper. You look for the best "bang for your buck", longevity, and high resale value.',
-    model: 'gemini-3.1-flash',
+    model: 'gemini-2.5-flash',
   },
 };
 
